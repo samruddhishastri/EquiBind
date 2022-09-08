@@ -39,63 +39,65 @@ from models.equibind import EquiBind
 faulthandler.enable()
 
 def parse_arguments(arglist = None):
-    p = argparse.ArgumentParser()
-    p.add_argument("-l", "--ligands_sdf", type=str,
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-l", "--ligands_sdf", type=str,
                     help = ("A single sdf file containing all ligands"
                     "to be screened when running in screening mode"))
-    p.add_argument("-r", "--rec_pdb", type = str,
+    parser.add_argument("-r", "--rec_pdb", type = str,
                     help = ("The receptor to dock the ligands in --ligands_sdf against"))
-    p.add_argument('-o', '--output_directory', type=str, default=None,
+    parser.add_argument('-o', '--output_directory', type=str, default=None,
                     help='path where to put the predicted results')
-    p.add_argument('--config', type=argparse.FileType(mode='r'), default=None)
-    p.add_argument('--checkpoint', '--model', dest = "checkpoint",
+    parser.add_argument('--config', type=argparse.FileType(mode='r'), default=None)
+    parser.add_argument('--checkpoint', '--model', dest = "checkpoint",
                    type=str, help='path to .pt file containing the model used for inference.'
                    'Defaults to runs/flexible_self_docking/best_checkpoint.pt'
                    'in the same directory as the file being run')
-    p.add_argument('--train_args', type = str,
+    parser.add_argument('--train_args', type = str,
                     help = ("Path to a yaml file containing"
                     "the parameters that were used to train the model."
                     "If not supplied, it is assumed that a file named"
                     "'train_arguments.yaml' is located in the same directory"
                     "as the model checkpoint"))
-    p.add_argument('--no_skip', dest = "skip_in_output", action = "store_false", help = (
+    parser.add_argument('--no_skip', dest = "skip_in_output", action = "store_false", help = (
                     'skip input files that already have corresponding folders'
                     'in the output directory.'
                     'Used to resume a large interrupted computation'))
-    p.add_argument('--batch_size', type=int, default=8, help=(
+    parser.add_argument('--batch_size', type=int, default=8, help=(
                     'samples that will be processed in parallel'))
-    p.add_argument("--n_workers_data_load", type = int, default = 0, help = (
+    parser.add_argument("--n_workers_data_load", type = int, default = 0, help = (
                     "The number of cores used for loading the ligands"
                     "and generating the graphs used as input to the model."
                     "0 means run in correct process."))
-    p.add_argument('--use_rdkit_coords', action="store_true", help=(
+    parser.add_argument('--use_rdkit_coords', action="store_true", help=(
                     'override the rkdit usage behavior of the used model'))
-    p.add_argument('--device', type=str, default='cuda', help=(
+    parser.add_argument('--device', type=str, default='cuda', help=(
                     'What device to train on: cuda or cpu'))
-    p.add_argument('--seed', type=int, default=1, help='seed for reproducibility')
-    p.add_argument('--num_confs', type=int, default=1, help='num_confs if using rdkit conformers')
-    p.add_argument("--lig_slice", help = ("Run only a slice of the provided ligand file."
+    parser.add_argument('--seed', type=int, default=1, help='seed for reproducibility')
+    parser.add_argument('--num_confs', type=int, default=1,
+                        help='num_confs if using rdkit conformers')
+    parser.add_argument("--lig_slice", help = ("Run only a slice of the provided ligand file."
                     "Like in python, this slice is HALF-OPEN."
                     "Should be provided in the format --lig_slice start,end"))
-    p.add_argument("--lazy_dataload", dest = "lazy_dataload", action="store_true", default = None,
+    parser.add_argument("--lazy_dataload", dest = "lazy_dataload",
+                    action="store_true", default = None,
                     help = ("Turns on lazy dataloading. If on, will postpone rdkit parsing"
                     "of each ligand until it is requested."))
-    p.add_argument("--no_lazy_dataload", dest = "lazy_dataload", action="store_false",
+    parser.add_argument("--no_lazy_dataload", dest = "lazy_dataload", action="store_false",
                     default = None,
                     help = ("Turns off lazy dataloading."
                     "If on, will postpone rdkit parsing"
                     "of each ligand until it is requested."))
-    p.add_argument("--no_run_corrections", dest = "run_corrections", action = "store_false",
+    parser.add_argument("--no_run_corrections", dest = "run_corrections", action = "store_false",
                     help = "possibility of turning off running fast point cloud ligand fitting")
 
-    cmdline_parser = deepcopy(p)
-    args = p.parse_args(arglist)
+    cmdline_parser = deepcopy(parser)
+    args = parser.parse_args(arglist)
     clear_defaults = {key: argparse.SUPPRESS for key in args.__dict__}
     cmdline_parser.set_defaults(**clear_defaults)
     cmdline_parser._defaults = {}
     cmdline_args = cmdline_parser.parse_args(arglist)
 
-    return p.parse_args(arglist), set(cmdline_args.__dict__.keys())
+    return parser.parse_args(arglist), set(cmdline_args.__dict__.keys())
 
 def get_default_args(args, cmdline_args):
     if args.config:
@@ -103,8 +105,8 @@ def get_default_args(args, cmdline_args):
         arg_dict = args.__dict__
         for key, value in config_dict.items():
             if isinstance(value, list):
-                for v in value:
-                    arg_dict[key].append(v)
+                for val in value:
+                    arg_dict[key].append(val)
             else:
                 arg_dict[key] = value
         args.config = args.config.name
@@ -116,12 +118,11 @@ def get_default_args(args, cmdline_args):
         "runs/flexible_self_docking/best_checkpoint.pt")
 
     config_dict['checkpoint'] = args.checkpoint
+    
+    #overwrite args with args from checkpoint except for the args
+    #that were contained in the config file
+    #or provided directly in the commandline
 
-    '''
-    overwrite args with args from checkpoint except for the args
-    that were contained in the config file
-    or provided directly in the commandline
-    '''
     arg_dict = args.__dict__
 
     if args.train_args is None:
@@ -135,8 +136,8 @@ def get_default_args(args, cmdline_args):
     for key, value in checkpoint_dict.items():
         if (key not in config_dict.keys()) and (key not in cmdline_args):
             if isinstance(value, list) and key in arg_dict:
-                for v in value:
-                    arg_dict[key].append(v)
+                for val in value:
+                    arg_dict[key].append(val)
             else:
                 arg_dict[key] = value
     args.model_parameters['noise_initial'] = 0
@@ -148,7 +149,7 @@ def load_rec_and_model(args):
     print(f"device = {device}")
     # sys.exit()
     checkpoint = torch.load(args.checkpoint, map_location=device)
-    dp = args.dataset_params
+    dataset_params = args.dataset_params
 
     model = EquiBind(device = device, lig_input_edge_feats_dim = 15,
                 rec_input_edge_feats_dim = 27, **args.model_parameters)
@@ -159,12 +160,12 @@ def load_rec_and_model(args):
     rec_path = args.rec_pdb
     rec, rec_coords, c_alpha_coords, n_coords, c_coords = get_receptor_inference(rec_path)
     rec_graph = get_rec_graph(rec, rec_coords, c_alpha_coords, n_coords, c_coords,
-                                use_rec_atoms=dp['use_rec_atoms'],
-                                rec_radius=dp['rec_graph_radius'],
-                                surface_max_neighbors=dp['surface_max_neighbors'],
-                                surface_graph_cutoff=dp['surface_graph_cutoff'],
-                                surface_mesh_cutoff=dp['surface_mesh_cutoff'],
-                                c_alpha_max_neighbors=dp['c_alpha_max_neighbors'])
+                                use_rec_atoms=dataset_params['use_rec_atoms'],
+                                rec_radius=dataset_params['rec_graph_radius'],
+                                surface_max_neighbors=dataset_params['surface_max_neighbors'],
+                                surface_graph_cutoff=dataset_params['surface_graph_cutoff'],
+                                surface_mesh_cutoff=dataset_params['surface_mesh_cutoff'],
+                                c_alpha_max_neighbors=dataset_params['c_alpha_max_neighbors'])
 
     return rec_graph, model
 
@@ -205,31 +206,31 @@ def run_corrections(lig, lig_coord, ligs_coords_pred_untuned):
     lig_input = deepcopy(lig)
     conf = lig_input.GetConformer()
     for i in range(lig_input.GetNumAtoms()):
-        x, y, z = input_coords.numpy()[i]
-        conf.SetAtomPosition(i, Point3D(float(x), float(y), float(z)))
+        x_coord, y_coord, z_coord = input_coords.numpy()[i]
+        conf.SetAtomPosition(i, Point3D(float(x_coord), float(y_coord), float(z_coord)))
 
     lig_equibind = deepcopy(lig)
     conf = lig_equibind.GetConformer()
     for i in range(lig_equibind.GetNumAtoms()):
-        x,y,z = prediction.numpy()[i]
-        conf.SetAtomPosition(i, Point3D(float(x), float(y), float(z)))
+        x_coord, y_coord, z_coord = prediction.numpy()[i]
+        conf.SetAtomPosition(i, Point3D(float(x_coord), float(y_coord), float(z_coord)))
 
     coords_pred = lig_equibind.GetConformer().GetPositions()
 
-    Z_pt_cloud = coords_pred
+    z_pt_cloud = coords_pred
     rotable_bonds = get_torsions([lig_input])
     new_dihedrals = np.zeros(len(rotable_bonds))
     for idx, r in enumerate(rotable_bonds):
         new_dihedrals[idx] = get_dihedral_vonMises(lig_input,
-                            lig_input.GetConformer(), r, Z_pt_cloud)
+                            lig_input.GetConformer(), r, z_pt_cloud)
     optimized_mol = apply_changes(lig_input, new_dihedrals, rotable_bonds)
     optimized_conf = optimized_mol.GetConformer()
     coords_pred_optimized = optimized_conf.GetPositions()
-    R, t = rigid_transform_Kabsch_3D(coords_pred_optimized.T, coords_pred.T)
-    coords_pred_optimized = (R @ (coords_pred_optimized).T).T + t.squeeze()
+    r_mat, t_mat = rigid_transform_Kabsch_3D(coords_pred_optimized.T, coords_pred.T)
+    coords_pred_optimized = (r_mat @ (coords_pred_optimized).T).T + t_mat.squeeze()
     for i in range(optimized_mol.GetNumAtoms()):
-        x, y, z = coords_pred_optimized[i]
-        optimized_conf.SetAtomPosition(i, Point3D(float(x), float(y), float(z)))
+        x_coord, y_coord, z_coord = coords_pred_optimized[i]
+        optimized_conf.SetAtomPosition(i, Point3D(float(x_coord), float(y_coord), float(z_coord)))
     return optimized_mol
 
 def write_while_inferring(dataloader, model, args):
@@ -248,8 +249,8 @@ def write_while_inferring(dataloader, model, args):
                 i += args.batch_size
                 print(f'''Entering batch ending in index 
                         {min(i, total_ligs)}/{len(dataloader.dataset)}''')
-                ligs, lig_coords, lig_graphs, rec_graphs,
-                geometry_graphs, true_indices, failed_in_batch = batch
+                (ligs, lig_coords, lig_graphs, rec_graphs,
+                geometry_graphs, true_indices, failed_in_batch) = batch
                 for failure in failed_in_batch:
                     if failure[1] == "Skipped":
                         continue
@@ -260,13 +261,13 @@ def write_while_inferring(dataloader, model, args):
                 lig_graphs = lig_graphs.to(args.device)
                 rec_graphs = rec_graphs.to(args.device)
                 geometry_graphs = geometry_graphs.to(args.device)
-                
-                out_ligs, out_lig_coords, predictions,
-                successes, failures = run_batch(model, ligs, lig_coords,
+                               
+                (out_ligs, out_lig_coords, predictions,
+                successes, failures) = run_batch(model, ligs, lig_coords,
                                                 lig_graphs, rec_graphs,
                                                 geometry_graphs, true_indices)
-                opt_mols = [run_corrections(lig, lig_coord, prediction) 
-                                            for lig, lig_coord, prediction in 
+                opt_mols = [run_corrections(lig, lig_coord, prediction)
+                                            for lig, lig_coord, prediction in
                                             zip(out_ligs, out_lig_coords, predictions)]
                 for mol, success in zip(opt_mols, successes):
                     writer.write(mol)
@@ -279,13 +280,13 @@ def write_while_inferring(dataloader, model, args):
 
 def main(arglist = None):
     args, cmdline_args = parse_arguments(arglist)
-    
+
     args = get_default_args(args, cmdline_args)
     assert args.output_directory, "An output directory should be specified"
     assert args.ligands_sdf, "No ligand sdf specified"
     assert args.rec_pdb, "No protein specified"
     seed_all(args.seed)
-    
+
     os.makedirs(args.output_directory, exist_ok = True)
 
     success_path = os.path.join(args.output_directory, "success.txt")
@@ -298,13 +299,13 @@ def main(arglist = None):
         print(f"Found {len(previous_work)} previously calculated ligands")
     else:
         previous_work = None
-        
+
     rec_graph, model = load_rec_and_model(args)
     if args.lig_slice is not None:
         lig_slice = tuple(map(int, args.lig_slice.split(",")))
     else:
         lig_slice = None
-    
+
     lig_data = multiple_ligands.Ligands(args.ligands_sdf,
                             rec_graph, args, slice = lig_slice,
                             skips = previous_work, lazy = args.lazy_dataload)
@@ -317,7 +318,7 @@ def main(arglist = None):
         for failure in lig_data.failed_ligs:
             failed_file.write(f"{failure[0]} {failure[1]}")
             failed_file.write("\n")
-    
+
     write_while_inferring(lig_loader, model, args)
 
 if __name__ == '__main__':
