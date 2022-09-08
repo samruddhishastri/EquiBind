@@ -19,11 +19,14 @@ from torch.utils.tensorboard import SummaryWriter
 
 from commons.utils import flatten_dict, tensorboard_gradient_magnitude, move_to_device, list_detach, concat_if_list, log
 
-
 class Trainer():
-    def __init__(self, model, args, metrics: Dict[str, Callable], main_metric: str, device: torch.device,
-                 tensorboard_functions: Dict[str, Callable] = None, optim=None, main_metric_goal: str = 'min',
-                 loss_func=torch.nn.MSELoss(), scheduler_step_per_batch: bool = True, run_dir='', sampler=None):
+    def __init__(self, model, args, metrics: Dict[str, Callable],
+                main_metric: str, device: torch.device,
+                tensorboard_functions: Dict[str, Callable] = None,
+                optim=None, main_metric_goal: str = 'min',
+                loss_func=torch.nn.MSELoss(),
+                scheduler_step_per_batch: bool = True,
+                run_dir='', sampler=None):
 
         self.args = args
         self.device = device
@@ -43,7 +46,7 @@ class Trainer():
             self.writer = SummaryWriter(os.path.dirname(args.checkpoint))
             self.model.load_state_dict(checkpoint['model_state_dict'])
             self.optim.load_state_dict(checkpoint['optimizer_state_dict'])
-            if self.lr_scheduler != None and checkpoint['scheduler_state_dict'] != None:
+            if self.lr_scheduler is not None and checkpoint['scheduler_state_dict'] is not None:
                 self.lr_scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
             self.start_epoch = checkpoint['epoch']
             self.best_val_score = checkpoint['best_val_score']
@@ -51,10 +54,12 @@ class Trainer():
         else:
             self.start_epoch = 1
             self.optim_steps = 0
-            self.best_val_score = -np.inf if self.main_metric_goal == 'max' else np.inf  # running score to decide whether or not a new model should be saved
+            # running score to decide whether or not a new model should be saved
+            self.best_val_score = -np.inf if self.main_metric_goal == 'max' else np.inf
             self.writer = SummaryWriter(run_dir)
-            shutil.copyfile(self.args.config, os.path.join(self.writer.log_dir, os.path.basename(self.args.config)))
-        #for i, param_group in enumerate(self.optim.param_groups):
+            shutil.copyfile(self.args.config, os.path.join(self.writer.log_dir,
+                            os.path.basename(self.args.config)))
+        # for i, param_group in enumerate(self.optim.param_groups):
         #    param_group['lr'] = 0.0003
         self.epoch = self.start_epoch
         log(f'Log directory: {self.writer.log_dir}')
@@ -66,8 +71,12 @@ class Trainer():
         pass
 
     def train(self, train_loader: DataLoader, val_loader: DataLoader):
-        epochs_no_improve = 0  # counts every epoch that the validation accuracy did not improve for early stopping
-        for epoch in range(self.start_epoch, self.args.num_epochs + 1):  # loop over the dataset multiple times
+        # counts every epoch that the validation accuracy
+        # did not improve for early stopping
+        epochs_no_improve = 0
+        
+        # loop over the dataset multiple times
+        for epoch in range(self.start_epoch, self.args.num_epochs + 1):
             self.epoch = epoch
             self.model.train()
             self.predict(train_loader, optim=self.optim)
@@ -77,37 +86,45 @@ class Trainer():
                 metrics, _, _ = self.predict(val_loader)
                 val_score = metrics[self.main_metric]
 
-                if self.lr_scheduler != None and not self.scheduler_step_per_batch:
+                if self.lr_scheduler is not None and not self.scheduler_step_per_batch:
                     self.step_schedulers(metrics=val_score)
 
                 if self.args.eval_per_epochs > 0 and epoch % self.args.eval_per_epochs == 0:
                     self.run_per_epoch_evaluations(val_loader)
 
-                self.tensorboard_log(metrics, data_split='val', log_hparam=True, step=self.optim_steps)
+                self.tensorboard_log(metrics, data_split='val',
+                                    log_hparam=True, step=self.optim_steps)
                 val_loss = metrics[type(self.loss_func).__name__]
-                log('[Epoch %d] %s: %.6f val loss: %.6f' % (epoch, self.main_metric, val_score, val_loss))
-                # save the model with the best main_metric depending on wether we want to maximize or minimize the main metric
-                if val_score >= self.best_val_score and self.main_metric_goal == 'max' or val_score <= self.best_val_score and self.main_metric_goal == 'min':
+                log(f"[Epoch {epoch}] {self.main_metric}: {val_score:.6f} val loss: {val_loss:.6f}")
+                # save the model with the best main_metric depending on
+                # wether we want to maximize or minimize the main metric
+                if (val_score >= self.best_val_score and self.main_metric_goal == 'max' or
+                    val_score <= self.best_val_score and self.main_metric_goal == 'min'):
                     epochs_no_improve = 0
                     self.best_val_score = val_score
                     self.save_checkpoint(epoch, checkpoint_name='best_checkpoint.pt')
                 else:
                     epochs_no_improve += 1
                 self.save_checkpoint(epoch, checkpoint_name='last_checkpoint.pt')
-                log('Epochs with no improvement: [', epochs_no_improve, '] and the best  ', self.main_metric,
-                    ' was in ', epoch - epochs_no_improve)
-                if epochs_no_improve >= self.args.patience and epoch >= self.args.minimum_epochs:  # stopping criterion
-                    log(f'Early stopping criterion based on -{self.main_metric}- that should be {self.main_metric_goal}-imized reached after {epoch} epochs. Best model checkpoint was in epoch {epoch - epochs_no_improve}.')
+                log('Epochs with no improvement: [', epochs_no_improve, '] and the best  ',
+                self.main_metric,' was in ', epoch - epochs_no_improve)
+                # stopping criterion
+                if epochs_no_improve >= self.args.patience and epoch >= self.args.minimum_epochs:
+                    log(f'''Early stopping criterion based on -{self.main_metric}- 
+                    that should be {self.main_metric_goal}-imized reached after {epoch} epochs. 
+                    Best model checkpoint was in epoch {epoch - epochs_no_improve}.''')
                     break
                 if epoch in self.args.models_to_save:
                     shutil.copyfile(os.path.join(self.writer.log_dir, 'best_checkpoint.pt'),
-                                    os.path.join(self.writer.log_dir, f'best_checkpoint_{epoch}epochs.pt'))
+                                    os.path.join(self.writer.log_dir,
+                                    f'best_checkpoint_{epoch}epochs.pt'))
                 self.after_epoch()
                 #if val_loss > 10000:
                 #    raise Exception
 
         # evaluate on best checkpoint
-        checkpoint = torch.load(os.path.join(self.writer.log_dir, 'best_checkpoint.pt'), map_location=self.device)
+        checkpoint = torch.load(os.path.join(self.writer.log_dir,'best_checkpoint.pt'),
+                                map_location=self.device)
         self.model.load_state_dict(checkpoint['model_state_dict'])
         return self.evaluation(val_loader, data_split='val_best_checkpoint')
 
@@ -120,20 +137,25 @@ class Trainer():
 
     def process_batch(self, batch, optim):
         loss, loss_components, predictions, targets = self.forward_pass(batch)
-        if optim != None:  # run backpropagation if an optimizer is provided
+        if optim is not None:  # run backpropagation if an optimizer is provided
             loss.backward()
-            if self.args.clip_grad != None:
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.args.clip_grad, norm_type=2)
+            if self.args.clip_grad is not None:
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(),
+                                                max_norm=self.args.clip_grad,
+                                                norm_type=2)
             self.optim.step()
             self.after_optim_step()  # overwrite this function to do stuff before zeroing out grads
             self.optim.zero_grad()
             self.optim_steps += 1
         return loss, loss_components, list_detach(predictions), list_detach(targets)
-
-    def predict(self, data_loader: DataLoader, optim: torch.optim.Optimizer = None, return_pred=False):
+        
+    def predict(self, data_loader: DataLoader, 
+                optim: torch.optim.Optimizer = None,
+                return_pred=False):
         total_metrics = {k: 0 for k in
-                         list(self.metrics.keys()) + [type(self.loss_func).__name__, 'mean_pred', 'std_pred',
-                                                      'mean_targets', 'std_targets']}
+                         list(self.metrics.keys()) + [type(self.loss_func).__name__,
+                                'mean_pred', 'std_pred',
+                                'mean_targets', 'std_targets']}
         epoch_targets = []
         epoch_predictions = []
         epoch_loss = 0
@@ -142,16 +164,19 @@ class Trainer():
             # loss components is either none, or a dict with the components of the loss function
             loss, loss_components, predictions, targets = self.process_batch(batch, optim)
             with torch.no_grad():
-                if loss_components != None and i == 0:  # add loss_component keys to total_metrics
+                # add loss_component keys to total_metrics
+                if loss_components is not None and i == 0:
                     total_metrics.update({k: 0 for k in loss_components.keys()})
-                if self.optim_steps % self.args.log_iterations == 0 and optim != None:
+                if self.optim_steps % self.args.log_iterations == 0 and optim is not None:
                     metrics = self.evaluate_metrics(predictions, targets)
                     metrics[type(self.loss_func).__name__] = loss.item()
                     metrics.update(loss_components)
                     self.tensorboard_log(metrics, data_split='train', step=self.optim_steps)
-                    log('[Epoch %d; Iter %5d/%5d] %s: loss: %.7f' % (
-                        self.epoch, i + 1, len(data_loader), 'train', loss.item()))
-                if optim == None and self.val_per_batch:  # during validation or testing when we want to average metrics over all the data in that dataloader
+                    log(f'''[Epoch {self.epoch}; Iter {i+1:5d}/{len(data_loader):5d}] 
+                        'train': loss: {loss.item().7f}''')
+                
+                # during validation or testing when we want to average metrics over all the data in that dataloader
+                if optim == None and self.val_per_batch:
                     metrics = self.evaluate_metrics(predictions, targets, val=True)
                     metrics[type(self.loss_func).__name__] = loss.item()
                     metrics.update(loss_components)
