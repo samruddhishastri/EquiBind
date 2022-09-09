@@ -20,10 +20,12 @@ io = PDBIO()
 biopython_parser = PDBParser()
 for name in tqdm(names):
     rec_path = os.path.join(data_dir, name, f'{name}_protein_obabel_reduce.pdb')
-    lig = read_molecule(os.path.join(data_dir, name, f'{name}_ligand.sdf'), sanitize=True, remove_hs=False)
-    if lig == None:
-        lig = read_molecule(os.path.join(data_dir, name, f'{name}_ligand.mol2'), sanitize=True, remove_hs=False)
-    if lig == None:
+    lig = read_molecule(os.path.join(data_dir, name, f'{name}_ligand.sdf'),
+                sanitize=True, remove_hs=False)
+    if lig is None:
+        lig = read_molecule(os.path.join(data_dir, name, f'{name}_ligand.mol2'),
+                sanitize=True, remove_hs=False)
+    if lig is None:
         print('ligand was none for ', name)
         with open('select_chains.log', 'a') as file:
             file.write(f'{name}\n')
@@ -56,7 +58,10 @@ for name in tqdm(names):
                 if atom.name == 'C':
                     c = list(atom.get_vector())
                 residue_coords.append(list(atom.get_vector()))
-            if c_alpha != None and n != None and c != None:  # only append residue if it is an amino acid and not some weired molecule that is part of the complex
+
+            # only append residue if it is an amino acid and
+            # not some weired molecule that is part of the complex
+            if c_alpha is not None and n is not None and c is not None:
                 chain_coords.append(np.array(residue_coords))
                 count += 1
             else:
@@ -90,8 +95,12 @@ for name in tqdm(names):
         else:
             invalid_chain_ids.append(chain.get_id())
 
-#  Many thanks to Professor David Ryan Koes for spotting that the commented code only removes water and other chains while keeping the actual receptor chains.
-#  While directly modifying the .pdb file as text file is an option, we can again follow Prof. Koes's excellent advice and use the prody library as in the code below.
+# Many thanks to Professor David Ryan Koes for spotting
+# that the commented code only removes water and other chains
+# while keeping the actual receptor chains.
+# While directly modifying the .pdb file as text file is an option,
+# we can again follow Prof. Koes's excellent advice and use the
+# prody library as in the code below.
 #    io.set_structure(structure)
 #    io.save(os.path.join(data_dir,name,f'{name}_protein_processed2.pdb'))
     prot = prody.parsePDB(rec_path)

@@ -14,16 +14,20 @@ names = sorted(os.listdir(data_path))
 for i, name in tqdm(enumerate(names)):
     rec_path = os.path.join(data_path, name, f'{name}_protein_obabel.pdb')
     return_code = subprocess.run(
-        f"reduce -Trim {rec_path} > {os.path.join(data_path, name, f'{name}_protein_obabel_reduce_tmp.pdb')}", shell=True)
+        f"reduce -Trim {rec_path} > {os.path.join(data_path, name,
+        f'{name}_protein_obabel_reduce_tmp.pdb')}", shell=True)
     print(return_code)
     return_code2 = subprocess.run(
-        f"reduce -HIS {os.path.join(data_path, name, f'{name}_protein_obabel_reduce_tmp.pdb')} > {os.path.join(data_path, name, f'{name}_protein_obabel_reduce.pdb')}", shell=True)
+        f"reduce -HIS {os.path.join(data_path, name,
+        f'{name}_protein_obabel_reduce_tmp.pdb')} > \
+        {os.path.join(data_path, name, f'{name}_protein_obabel_reduce.pdb')}",
+        shell=True)
     print(return_code2)
     return_code2 = subprocess.run(
         f"rm {os.path.join(data_path, name, f'{name}_protein_obabel_reduce_tmp.pdb')}",
         shell=True)
     print(return_code2)
 
+time_var = time.time() - start_time
 
-
-print("--- %s seconds ---" % (time.time() - start_time))
+print(f'--- {time_var} seconds ---')

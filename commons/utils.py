@@ -14,40 +14,40 @@ from commons.logger import log
 
 
 def pmap_multi(pickleable_fn, data, n_jobs=None, verbose=1, desc=None, **kwargs):
-  """
+    """
 
-  Parallel map using joblib.
+    Parallel map using joblib.
 
-  Parameters
-  ----------
-  pickleable_fn : callable
-      Function to map over data.
-  data : iterable
-      Data over which we want to parallelize the function call.
-  n_jobs : int, optional
-      The maximum number of concurrently running jobs. By default, it is one less than
-      the number of CPUs.
-  verbose: int, optional
-      The verbosity level. If nonzero, the function prints the progress messages.
-      The frequency of the messages increases with the verbosity level. If above 10,
-      it reports all iterations. If above 50, it sends the output to stdout.
-  kwargs
-      Additional arguments for :attr:`pickleable_fn`.
+    Parameters
+    ----------
+    pickleable_fn : callable
+        Function to map over data.
+    data : iterable
+        Data over which we want to parallelize the function call.
+    n_jobs : int, optional
+        The maximum number of concurrently running jobs. By default, it is one less than
+        the number of CPUs.
+    verbose: int, optional
+        The verbosity level. If nonzero, the function prints the progress messages.
+        The frequency of the messages increases with the verbosity level. If above 10,
+        it reports all iterations. If above 50, it sends the output to stdout.
+    kwargs
+        Additional arguments for :attr:`pickleable_fn`.
 
-  Returns
-  -------
-  list
-      The i-th element of the list corresponds to the output of applying
-      :attr:`pickleable_fn` to :attr:`data[i]`.
-  """
-  if n_jobs is None:
-    n_jobs = cpu_count() - 1
+    Returns
+    -------
+    list
+        The i-th element of the list corresponds to the output of applying
+        :attr:`pickleable_fn` to :attr:`data[i]`.
+    """
+    if n_jobs is None:
+        n_jobs = cpu_count() - 1
 
-  results = Parallel(n_jobs=n_jobs, verbose=verbose, timeout=None)(
+    results = Parallel(n_jobs=n_jobs, verbose=verbose, timeout=None)(
     delayed(pickleable_fn)(*d, **kwargs) for i, d in tqdm(enumerate(data),desc=desc)
-  )
+    )
 
-  return results
+    return results
 
 def seed_all(seed):
     if not seed:
@@ -78,15 +78,13 @@ def get_adj_matrix(n_nodes, batch_size, device):
         edges_dic_b = edges_dic[n_nodes]
         if batch_size in edges_dic_b:
             return edges_dic_b[batch_size]
-        else:
-            # get edges for a single sample
-            rows, cols = [], []
-            for batch_idx in range(batch_size):
-                for i in range(n_nodes):
-                    for j in range(n_nodes):
-                        rows.append(i + batch_idx*n_nodes)
-                        cols.append(j + batch_idx*n_nodes)
-
+        # get edges for a single sample
+        rows, cols = [], []
+        for batch_idx in range(batch_size):
+            for i in range(n_nodes):
+                for j in range(n_nodes):
+                    rows.append(i + batch_idx*n_nodes)
+                    cols.append(j + batch_idx*n_nodes)
     else:
         edges_dic[n_nodes] = {}
         return get_adj_matrix(n_nodes, batch_size, device)
@@ -137,29 +135,29 @@ def flatten_dict(params: Dict[Any, Any], delimiter: str = '/') -> Dict[str, Any]
     return dictionary
 
 
-
-
-def tensorboard_gradient_magnitude(optimizer: torch.optim.Optimizer, writer: SummaryWriter, step, param_groups=[0]):
+def tensorboard_gradient_magnitude(optimizer: torch.optim.Optimizer, writer: SummaryWriter,
+                                    step, param_groups=[0]):
     for i, param_group in enumerate(optimizer.param_groups):
         if i in param_groups:
             all_params = []
             for params in param_group['params']:
-                if params.grad != None:
+                if params.grad is not None:
                     all_params.append(params.grad.view(-1))
-            writer.add_scalar(f'gradient_magnitude_param_group_{i}', torch.cat(all_params).abs().mean(),
-                              global_step=step)
+            writer.add_scalar(f'gradient_magnitude_param_group_{i}',
+                                torch.cat(all_params).abs().mean(),
+                                global_step=step)
 
 def move_to_device(element, device):
     '''
-    takes arbitrarily nested list and moves everything in it to device if it is a dgl graph or a torch tensor
+    takes arbitrarily nested list and moves everything in it to device
+    if it is a dgl graph or a torch tensor
     :param element: arbitrarily nested list
     :param device:
     :return:
     '''
     if isinstance(element, list):
         return [move_to_device(x, device) for x in element]
-    else:
-        return element.to(device) if isinstance(element,(torch.Tensor, dgl.DGLGraph)) else element
+    return element.to(device) if isinstance(element,(torch.Tensor, dgl.DGLGraph)) else element
 
 def list_detach(element):
     '''
@@ -169,8 +167,7 @@ def list_detach(element):
     '''
     if isinstance(element, list):
         return [list_detach(x) for x in element]
-    else:
-        return element.detach()
+    return element.detach()
 
 def concat_if_list(tensor_or_tensors):
     return torch.cat(tensor_or_tensors) if isinstance(tensor_or_tensors, list) else tensor_or_tensors

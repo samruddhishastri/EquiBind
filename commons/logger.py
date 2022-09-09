@@ -21,3 +21,4 @@ class Logger(object):
 
 def log(*args):
     print(f'[{datetime.now()}]', *args)
+    

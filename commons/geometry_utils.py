@@ -16,7 +16,8 @@ def random_rotation_translation(translation_distance):
     t = t / np.sqrt( np.sum(t * t))
     length = np.random.uniform(low=0, high=translation_distance)
     t = t * length
-    return torch.from_numpy(rotation_matrix.astype(np.float32)), torch.from_numpy(t.astype(np.float32))
+    return (torch.from_numpy(rotation_matrix.astype(np.float32)),
+            torch.from_numpy(t.astype(np.float32)))
 
 # R = 3x3 rotation matrix
 # t = 3x1 column vector
@@ -94,7 +95,6 @@ def rigid_transform_Kabsch_3D_torch(A, B):
     t = -R @ centroid_A + centroid_B
     return R, t
 
-
 def get_torsions(mol_list):
     atom_counter = 0
     torsionList = []
@@ -130,10 +130,10 @@ def get_torsions(mol_list):
                         torsionList.append(
                             (idx4 + atom_counter, idx3 + atom_counter, idx2 + atom_counter, idx1 + atom_counter))
                         break
-                    else:
-                        torsionList.append(
-                            (idx1 + atom_counter, idx2 + atom_counter, idx3 + atom_counter, idx4 + atom_counter))
-                        break
+        
+                    torsionList.append((idx1 + atom_counter, idx2 + atom_counter,
+                                        idx3 + atom_counter, idx4 + atom_counter))
+                    break
                 break
 
         atom_counter += m.GetNumAtoms()
@@ -156,12 +156,19 @@ def GetDihedral(conf, atom_idx):
 
 def GetTransformationMatrix(transformations):
     x, y, z, disp_x, disp_y, disp_z = transformations
-    transMat = np.array([[np.cos(z) * np.cos(y), (np.cos(z) * np.sin(y) * np.sin(x)) - (np.sin(z) * np.cos(x)),
-                          (np.cos(z) * np.sin(y) * np.cos(x)) + (np.sin(z) * np.sin(x)), disp_x],
-                         [np.sin(z) * np.cos(y), (np.sin(z) * np.sin(y) * np.sin(x)) + (np.cos(z) * np.cos(x)),
-                          (np.sin(z) * np.sin(y) * np.cos(x)) - (np.cos(z) * np.sin(x)), disp_y],
-                         [-np.sin(y), np.cos(y) * np.sin(x), np.cos(y) * np.cos(x), disp_z],
-                         [0, 0, 0, 1]], dtype=np.double)
+    transMat = np.array([
+                        
+                        [np.cos(z) * np.cos(y), 
+                        (np.cos(z) * np.sin(y) * np.sin(x)) - (np.sin(z) * np.cos(x)),
+                        (np.cos(z) * np.sin(y) * np.cos(x)) + (np.sin(z) * np.sin(x)), disp_x],
+                        
+                        [np.sin(z) * np.cos(y), 
+                        (np.sin(z) * np.sin(y) * np.sin(x)) + (np.cos(z) * np.cos(x)),
+                        (np.sin(z) * np.sin(y) * np.cos(x)) - (np.cos(z) * np.sin(x)), disp_y],
+                            
+                        [-np.sin(y), np.cos(y) * np.sin(x), np.cos(y) * np.cos(x), disp_z],
+                            
+                        [0, 0, 0, 1]], dtype=np.double)
     return transMat
 
 
@@ -170,13 +177,17 @@ def apply_changes(mol, values, rotable_bonds):
     #     opt_mol = add_rdkit_conformer(opt_mol)
 
     # apply rotations
-    [SetDihedral(opt_mol.GetConformer(), rotable_bonds[r], values[r]) for r in range(len(rotable_bonds))]
+    [SetDihedral(opt_mol.GetConformer(), rotable_bonds[r], values[r]) \
+        for r in range(len(rotable_bonds))]
 
     #     # apply transformation matrix
-    #     rdMolTransforms.TransformConformer(opt_mol.GetConformer(), GetTransformationMatrix(values[:6]))
-
+    #     rdMolTransforms.TransformConformer(opt_mol.GetConformer(), 
+    # GetTransformationMatrix(values[:6]))
     return opt_mol
-# Clockwise dihedral2 from https://stackoverflow.com/questions/20305272/dihedral-torsion-angle-from-four-points-in-cartesian-coordinates-in-python
+
+# Clockwise dihedral2 from 
+# https://stackoverflow.com/questions/20305272/dihedral-torsion-angle-from-four-
+# points-in-cartesian-coordinates-in-python
 def GetDihedralFromPointCloud(Z, atom_idx):
     p = Z[list(atom_idx)]
     b = p[:-1] - p[1:]
@@ -217,7 +228,8 @@ def get_dihedral_vonMises(mol, conf, atom_idx, Z):
                 continue
             assert k != l
             s_star = S_vec(GetDihedralFromPointCloud(Z, (k, i, j, l)))
-            a_mat = A_transpose_matrix(GetDihedral(conf, (k, i, j, k_0)) + GetDihedral(conf, (l_0, i, j, l)))
+            a_mat = A_transpose_matrix(GetDihedral(conf, (k, i, j, k_0)) + \
+                                        GetDihedral(conf, (l_0, i, j, l)))
             v = v + np.matmul(a_mat, s_star)
     v = v / np.linalg.norm(v)
     v = v.reshape(-1)

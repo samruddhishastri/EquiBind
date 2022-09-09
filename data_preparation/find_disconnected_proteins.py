@@ -12,7 +12,6 @@ import pandas as pd
 
 from commons.utils import write_strings_to_txt
 
-
 pdb_path = 'data/PDBBind'
 casf_names = os.listdir('data/deepBSP/casf_test')
 bsp_names = os.listdir('data/deepBSP/pdbbind_filtered')
@@ -27,9 +26,12 @@ df_data = df_data[['complex_name','resolution','year', 'logkd', 'kd', 'reference
 cutoff = 5
 connected = []
 for name in tqdm(pdbbind_names):
-    df = PandasPdb().read_pdb(os.path.join(pdb_path, name, f'{name}_protein_obabel_reduce.pdb')).df['ATOM']
-    df.rename(columns={'chain_id': 'chain', 'residue_number': 'residue', 'residue_name': 'resname',
-                       'x_coord': 'x', 'y_coord': 'y', 'z_coord': 'z', 'element_symbol': 'element'}, inplace=True)
+    df = PandasPdb().read_pdb(os.path.join(pdb_path, name,
+                        f'{name}_protein_obabel_reduce.pdb')).df['ATOM']
+    df.rename(columns={'chain_id': 'chain', 'residue_number': 'residue',
+                        'residue_name': 'resname',
+                       'x_coord': 'x', 'y_coord': 'y', 'z_coord': 'z',
+                       'element_symbol': 'element'}, inplace=True)
     df = list(df.groupby(['chain']))  ## Not the same as sequence order !
 
     chain_coords_list = []

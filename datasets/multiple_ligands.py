@@ -9,7 +9,7 @@ class Ligands(Dataset):
         self.ligpath = ligpath
         self.rec_graph = rec_graph
         self.args = args
-        self.dp = args.dataset_params
+        self.dataset_params = args.dataset_params
         self.use_rdkit_coords = args.use_rdkit_coords
         self.device = args.device
         self.rdkit_seed = rdkit_seed
@@ -25,7 +25,6 @@ class Ligands(Dataset):
                 ext = ligpath.split(".")[-1]
             except (AttributeError, KeyError):
                 ext = "sdf"
-        
 
         if lazy is None:
             if ext in extensions_defaulting_to_lazy:
@@ -36,12 +35,9 @@ class Ligands(Dataset):
             self.lazy = lazy
 
         if addH is None:
-            if ext == "smi":
-                addH = True
-            else:
-                addH = False
+            addH = bool(ext=="smi")
         self.addH = addH
-        
+       
         self.generate_conformer = ext in extensions_requiring_conformer_generation
 
         suppliers = {"sdf": SDMolSupplier, "smi": SmilesMolSupplier}
@@ -52,7 +48,8 @@ class Ligands(Dataset):
         if slice is None:
             self.slice = 0, len(self.supplier)
         else:
-            slice = (slice[0] if slice[0] >= 0 else len(self.supplier)+slice[0], slice[1] if slice[1] >= 0 else len(self.supplier)+slice[1])
+            slice = (slice[0] if slice[0] >= 0 else len(self.supplier)+slice[0],
+                    slice[1] if slice[1] >= 0 else len(self.supplier)+slice[1])
             self.slice = tuple(slice)
 
         self.failed_ligs = []
@@ -86,8 +83,7 @@ class Ligands(Dataset):
         sanitize_succeded = (SanitizeMol(lig, catchErrors = True) is SanitizeFlags.SANITIZE_NONE)
         if sanitize_succeded:
             return lig, lig.GetProp("_Name")
-        else:
-            return None, lig.GetProp("_Name")
+        return None, lig.GetProp("_Name")
 
     def __len__(self):
         return self._len
@@ -100,9 +96,9 @@ class Ligands(Dataset):
                 nonneg_idx = idx
 
             if nonneg_idx >= self._len or nonneg_idx < 0:
-                raise IndexError(f"Index {idx} out of range for Ligands dataset with length {len(self)}")
-            
-            
+                raise IndexError(f"Index {idx} out of range for Ligands \
+                                    dataset with length {len(self)}")         
+
             true_index = nonneg_idx + self.slice[0]
             if true_index in self.skips:
                 return true_index, "Skipped"
@@ -117,15 +113,19 @@ class Ligands(Dataset):
             lig = self.ligs[idx]
             true_index = self.true_idx[idx]
 
-        
         try:
-            lig_graph = get_lig_graph_revised(lig, lig.GetProp('_Name'), max_neighbors=self.dp['lig_max_neighbors'],
-                                            use_rdkit_coords=self.use_rdkit_coords, radius=self.dp['lig_graph_radius'])
+            lig_graph = get_lig_graph_revised(lig, lig.GetProp('_Name'), 
+                                            max_neighbors=self.dataset_params['lig_max_neighbors'],
+                                            use_rdkit_coords=self.use_rdkit_coords,
+                                            radius=self.dataset_params['lig_graph_radius'])
         except AssertionError:
             self.failed_ligs.append((true_index, lig.GetProp("_Name")))
             return true_index, lig.GetProp("_Name")
-        
-        geometry_graph = get_geometry_graph(lig) if self.dp['geometry_regularization'] else None
+
+        if self.dataset_params['geometry_regularization']:
+            geometry_graph = get_geometry_graph(lig)
+        else:
+            geometry_graph = None
 
         lig_graph.ndata["new_x"] = lig_graph.ndata["x"]
         return lig, lig_graph.ndata["new_x"], lig_graph, self.rec_graph, geometry_graph, true_index
@@ -138,7 +138,8 @@ class Ligands(Dataset):
         failed_in_batch = tuple(filter(sample_failed, _batch))
         if len(clean_batch) == 0:
             return None, None, None, None, None, None, failed_in_batch
-        ligs, lig_coords, lig_graphs, rec_graphs, geometry_graphs, true_indices = map(list, zip(*clean_batch))
+        (ligs, lig_coords, lig_graphs, rec_graphs,
+        geometry_graphs, true_indices) = map(list, zip(*clean_batch))
         output = (
             ligs,
             lig_coords,

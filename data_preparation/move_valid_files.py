@@ -19,9 +19,11 @@ for i, name in tqdm(enumerate(valid_names)):
         os.mkdir(f'../data/PDBBind_processed/{name}')
     rec_path = os.path.join(data_path, name, f'{name}_protein.pdb')
 
-    copyfile(os.path.join(data_path, name, f'{name}_protein_processed.pdb'), f'../data/PDBBind_processed/{name}/{name}_protein_processed.pdb')
-    copyfile(os.path.join(data_path, name, f'{name}_ligand.mol2'), f'../data/PDBBind_processed/{name}/{name}_ligand.mol2')
+    copyfile(os.path.join(data_path, name, f'{name}_protein_processed.pdb'),
+            f'../data/PDBBind_processed/{name}/{name}_protein_processed.pdb')
+    copyfile(os.path.join(data_path, name, f'{name}_ligand.mol2'),
+            f'../data/PDBBind_processed/{name}/{name}_ligand.mol2')
     copyfile(os.path.join(data_path, name, f'{name}_ligand.sdf'),
-             f'../data/PDBBind_processed/{name}/{name}_ligand.sdf')
+            f'../data/PDBBind_processed/{name}/{name}_ligand.sdf')
 
 
